@@ -1,0 +1,109 @@
+{
+  "project_name": "The Grind Station",
+  "theme": "dark",
+  "archetype": "2 (Performance Pro) + 5 (Luxury)",
+  "vibe": "High-end gym aesthetic, motivational fitness imagery, smooth animations, conversion-focused.",
+  "slogan": "Transform Your Body. Build Your Grind.",
+  "colors": {
+    "background": "#0A0A0A",
+    "surface": "#1A1A1A",
+    "surface_light": "#2A2A2A",
+    "primary": "#FF4500",
+    "primary_hover": "#FF5722",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A0A0A0",
+    "border": "#333333",
+    "success": "#22C55E",
+    "danger": "#EF4444"
+  },
+  "typography": {
+    "headings": {
+      "family": "Barlow Condensed, sans-serif",
+      "weight": "800",
+      "tracking": "tracking-tighter",
+      "transform": "uppercase"
+    },
+    "body": {
+      "family": "Manrope, sans-serif",
+      "weight": "400",
+      "tracking": "tracking-normal"
+    },
+    "scales": {
+      "h1": "text-5xl sm:text-6xl md:text-7xl",
+      "h2": "text-3xl sm:text-4xl md:text-5xl",
+      "h3": "text-2xl sm:text-3xl",
+      "body": "text-base",
+      "small": "text-sm",
+      "overline": "text-xs tracking-[0.2em] uppercase font-bold text-[#FF4500]"
+    }
+  },
+  "layouts": {
+    "marketing": {
+      "spacing": "p-8 md:p-16 lg:p-24",
+      "grid": "grid-cols-1 md:grid-cols-12 gap-8 md:gap-12",
+      "hero_overlay": "bg-gradient-to-r from-black/90 via-black/60 to-transparent",
+      "style": "Asymmetric, overlapping elements, generous breathing room. Use The Bento Grid Protocol (Tetris mode) for features."
+    },
+    "dashboard": {
+      "spacing": "p-4 md:p-6",
+      "grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6",
+      "card_style": "bg-[#1A1A1A] border border-[#333333] rounded-xl shadow-lg",
+      "style": "Dense, card-based grid. Prioritize data clarity. Control Room mode."
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#FF4500] hover:bg-[#FF5722] text-white font-bold uppercase tracking-widest px-8 py-4 rounded-none transition-all duration-300 transform hover:-translate-y-1 shadow-[0_0_15px_rgba(255,69,0,0.4)]",
+      "secondary": "bg-transparent border border-[#333333] hover:border-[#FF4500] text-white hover:text-[#FF4500] uppercase tracking-widest px-8 py-4 rounded-none transition-all duration-300"
+    },
+    "cards": {
+      "marketing": "bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-8 hover:border-[#FF4500]/50 transition-colors duration-300",
+      "dashboard": "bg-[#1A1A1A] border border-[#333333] rounded-xl p-6 hover:-translate-y-1 transition-all duration-200"
+    },
+    "navigation": "fixed top-0 w-full z-50 bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/10",
+    "icons": "lucide-react"
+  },
+  "motion": {
+    "page_transitions": "framer-motion opacity-0 to opacity-100 duration-500",
+    "scroll_animations": "framer-motion whileInView staggered fade-up",
+    "hover_effects": "transform hover:-translate-y-1 hover:shadow-lg transition-all duration-300",
+    "accessibility": "respect prefers-reduced-motion"
+  },
+  "media": {
+    "hero_image": "https://images.unsplash.com/photo-1641337221253-fdc7237f6b61?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwzfHx3ZWlnaHRsaWZ0aW5nJTIwZ3ltfGVufDB8fHx8MTc4MTEwNTc5OXww&ixlib=rb-4.1.0&q=85",
+    "classes": [
+      {
+        "name": "Grind Knockout",
+        "url": "https://images.unsplash.com/photo-1608202409296-a9cad928dd2f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHw0fHxib3hpbmclMjB3b3Jrb3V0JTIwZGFya3xlbnwwfHx8fDE3ODExMDU3ODR8MA&ixlib=rb-4.1.0&q=85"
+      },
+      {
+        "name": "Grind Strength",
+        "url": "https://images.unsplash.com/photo-1722925541142-5db2668ca492?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2ODl8MHwxfHNlYXJjaHwyfHx3ZWlnaHRsaWZ0aW5nJTIwZ3ltfGVufDB8fHx8MTc4MTEwNTc5OXww&ixlib=rb-4.1.0&q=85"
+      },
+      {
+        "name": "Boxing Focus",
+        "url": "https://images.unsplash.com/photo-1737381508529-a110d717d5a7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwyfHxib3hpbmclMjB3b3Jrb3V0JTIwZGFya3xlbnwwfHx8fDE3ODExMDU3ODR8MA&ixlib=rb-4.1.0&q=85"
+      }
+    ],
+    "facilities": [
+      {
+        "name": "Luxury Sauna",
+        "url": "https://images.unsplash.com/photo-1717356495389-6ab1e5ff9d84?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBzYXVuYSUyMHJvb218ZW58MHx8fHwxNzgxMTA1Nzg0fDA&ixlib=rb-4.1.0&q=85"
+      },
+      {
+        "name": "Steam Room",
+        "url": "https://images.unsplash.com/photo-1605614307370-f7a1e58ae751?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwyfHxsdXh1cnklMjBzYXVuYSUyMHJvb218ZW58MHx8fHwxNzgxMTA1Nzg0fDA&ixlib=rb-4.1.0&q=85"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "MUST use pure HTML + Tailwind for marketing pages, prioritizing overlapping layouts, generous spacing, and asymmetry.",
+    "MUST use Shadcn UI primarily for Dashboard interfaces. Heavily customize colors to match the dark luxury theme (remove default Vercel look).",
+    "Headings MUST use uppercase styling with tight tracking (Barlow Condensed preferred).",
+    "Incorporate framer-motion for smooth entrance animations and hover interactions.",
+    "Data dashboard MUST use dense 'gap-4' spacing with a solid 1px border (#333333) and subtle inner glow highlights for premium feel.",
+    "ALL interactive elements (buttons, inputs, links) MUST have 'data-testid' attributes in kebab-case based on role.",
+    "Ensure responsive design: Stack columns on mobile, use grid layouts on desktop.",
+    "Avoid using generic blue/purple gradients; strictly stick to obsidian, charcoal, and neon orange (#FF4500)."
+  ]
+}

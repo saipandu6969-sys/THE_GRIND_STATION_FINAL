@@ -1,0 +1,41 @@
+{
+  "summary": "Backend-only iteration 3 testing of Grind Station — avatar upload via Emergent Object Storage + PWA static assets. Added 19 new pytest cases in /app/backend/tests/test_grindstation_v3.py covering avatar upload (JPEG/PNG/WebP), MIME/size/empty-file validation, public avatar fetch, delete flow, /api/auth/me avatar_url contract, and all five PWA static files (manifest.json, sw.js, icon-192.png, icon-512.png, icon.svg). Full regression: 65/65 pass (30 v1 + 16 v2 + 19 v3).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/me/avatar", "issue": "Reads entire upload body into memory before size check (await file.read()). For >2MB uploads this still allocates the full payload before rejection. Consider streaming via file.spool/chunk read with running size counter to reject early."},
+      {"endpoint": "GET /api/me/avatar/{user_id}", "issue": "Cache-Control: public, max-age=300 is fine but no ETag or Last-Modified — clients can't conditionally revalidate after avatar replacement. Add ETag based on avatar_path UUID for cheap 304s."},
+      {"endpoint": "POST /api/me/avatar", "issue": "Replacement uploads do NOT delete the prior object from Emergent storage — old paths leak (orphan storage). Add a best-effort delete_object(prev_path) before overwriting."},
+      {"endpoint": "POST /api/me/avatar", "issue": "content_type comes straight from client header — no magic-byte sniffing. A client could send `Content-Type: image/jpeg` for an arbitrary 1MB binary blob and it would be stored. Acceptable for trusted-frontend scope but flag for hardening."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_grindstation_v3.py",
+    "/app/backend/tests/test_grindstation_v2.py",
+    "/app/backend/tests/test_grindstation.py",
+    "/app/test_reports/pytest/v3_results.xml",
+    "/app/test_reports/pytest/full_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~970 lines — splitting into routers (auth, plans, subscribe, classes, recovery, admin, avatar) is overdue. Pulling avatar endpoints into a dedicated router (and the put_object/get_object wrapper into a storage service module) would isolate Emergent Object Storage dependency.",
+    "Avatar size check happens AFTER reading the full body into memory; for true protection against DoS via large uploads use UploadFile.read(MAX_AVATAR_SIZE + 1) and reject if more bytes remain, or enforce at reverse-proxy level.",
+    "No MIME sniffing — server trusts client-supplied content_type. Use Pillow Image.open(BytesIO(data)).verify() or python-magic to validate the bytes actually match the declared image type.",
+    "Avatar replacement leaks the previous object in Emergent Object Storage (no delete on overwrite). Add best-effort cleanup of the old avatar_path before persisting the new one.",
+    "Avatar GET endpoint accepts an `auth` query param and `authorization` header but never uses them — dead parameters. Remove or honor them consistently.",
+    "Cache-Control: public, max-age=300 on avatars without an ETag will serve stale images for up to 5 minutes after upload. Either lower max-age, add ETag tied to avatar_path UUID, or vary URL by uploading a new UUID-suffixed path (already done) — but then clients still hit the same /api/me/avatar/{user_id} URL. Consider returning the UUID-suffixed canonical URL.",
+    "Emergent Object Storage credential rotation requires server restart (EMERGENT_LLM_KEY read at import time). Acceptable for current scope.",
+    "PWA sw.js / manifest.json / icons are served by frontend static and were verified at the preview host — they correctly include name='The Grind Station' and proper content-types (image/png, image/svg+xml, application/manifest+json or similar)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_grindstation_v3.py (new — 19 tests for avatar + PWA)"
+  ],
+  "success_rate": {"backend": "100% (65/65)", "frontend": "n/a (skipped per request)"},
+  "test_credentials": "admin@grindstation.com / Admin@Grind2026 ; member@grindstation.com / Member@Grind2026 — both verified. Most v3 tests register fresh @example.com users to keep the seeded member's avatar unmodified across runs.",
+  "seed_data_creation": "Each avatar test registers an isolated user via /api/auth/register and uploads a Pillow-generated in-memory image (50x50 px JPEG/PNG/WebP). Oversize test generates a ~27 MB JPEG by Image.frombytes(os.urandom(...)) on a 3000x3000 RGB canvas. No persistent test data left behind beyond ephemeral users + their avatars in Emergent Object Storage.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 65 backend tests pass at https://gym-membership-hub-24.preview.emergentagent.com. Run: `cd /app/backend && REACT_APP_BACKEND_URL=<preview-url> python -m pytest tests/ -v`. v2 file uses os.environ[...] (hard-required) while v1/v3 fall back to the preview URL — keep REACT_APP_BACKEND_URL exported. Avatar GET is public-by-design (no 401 path). PWA assets are served from frontend's /public/ on the same preview host (no /api prefix). First avatar upload of a fresh container can take 1–2s due to Emergent Object Storage warm-up; v3 timeouts are set to 30s for upload calls.",
+  "rca of the issue": "No issues encountered — all new endpoints and PWA assets behave per spec. Emergent Object Storage integration works end-to-end (upload → fetch by user_id → delete → 404). avatar_url contract on /api/auth/me correctly toggles between null and `/api/me/avatar/{id}`."
+}

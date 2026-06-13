@@ -1,0 +1,41 @@
+{
+  "summary": "Backend-only iteration 2 testing of Grind Station v2 — Razorpay mock fallback, forgot/reset password, advance booking window (0–3 days), PDF invoice, dashboard status=success filter. Added 16 new pytest cases in /app/backend/tests/test_grindstation_v2.py. Refreshed stale hardcoded session dates in iteration 1's regression file to dynamic dates within the new 3-day window. All 46/46 tests pass (30 regression + 16 new).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/classes/book", "issue": "Advance-window check runs BEFORE membership check, so a non-member submitting a past/out-of-window date receives 400 ('past sessions' or 'up to 3 days') instead of 403 ('Active membership required'). Order of validations is acceptable but consider gating on membership first for clearer 401/403 signalling."},
+      {"endpoint": "/api/auth/forgot-password", "issue": "Returns dev_token=null for unknown emails (key still present in JSON). Technically does not leak existence since key always exists, but a cleaner contract would omit the key entirely for unknown emails (we tolerate both via assertion)."},
+      {"endpoint": "/api/payments/{id}/invoice.pdf", "issue": "Imports reportlab/BytesIO inside the request handler on every call — small per-request overhead. Move imports to module top for production."},
+      {"endpoint": "/api/subscribe/create-order", "issue": "When create-order is called repeatedly without verify, it accumulates 'pending' payments forever (no TTL/cleanup). Cosmetic; verify() and dashboard correctly ignore them."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_grindstation_v2.py",
+    "/app/backend/tests/test_grindstation.py",
+    "/app/test_reports/pytest/full_results.xml",
+    "/app/test_reports/pytest/v2_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~880 lines — strongly recommend splitting into routers (auth, plans, subscribe/payments, classes, recovery, admin) before next iteration to keep maintainability.",
+    "PDF generation imports (reportlab, BytesIO, StreamingResponse) should be hoisted to module top to avoid per-request import cost.",
+    "send_email() is a console stub — clearly mocked. When plugging Resend/SendGrid, move to background task (FastAPI BackgroundTasks) so HTTP request isn't blocked by SMTP latency.",
+    "password_reset_tokens collection has no index on `token` field — add unique index for fast lookup and to prevent dup tokens; also add TTL index on expires_at for auto-cleanup.",
+    "Forgot-password response leaks key presence even when omitting dev_token (returns `null`). For PROD, response should be identical bytes regardless of email existence.",
+    "Booking validation order: window check fires before membership check, leading to 400 instead of 403 for non-members with stale dates. Minor UX/contract inconsistency.",
+    "RAZORPAY_KEY_SECRET is read at import time only — rotation requires server restart. Acceptable for current scope.",
+    "verify_payment computes HMAC signature only when RAZORPAY_ENABLED; mock path accepts ANY pending_payment_id without further checks. Fine for dev, but document that this code path must never run in production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_grindstation_v2.py (new)",
+    "/app/backend/tests/test_grindstation.py (replaced hardcoded 2026-02-15 / 2026-03-10 dates with dynamic _future_date(2) to satisfy the new 3-day advance window)"
+  ],
+  "success_rate": {"backend": "100% (46/46)", "frontend": "n/a (skipped per request)"},
+  "test_credentials": "admin@grindstation.com / Admin@Grind2026 ; member@grindstation.com / Member@Grind2026 — both verified.",
+  "seed_data_creation": "Each new test registers a fresh @example.com user via /api/auth/register, and the `fresh_member` session fixture additionally completes one create-order + verify cycle to obtain an active membership for booking/invoice tests. No persistent test data left behind beyond ephemeral users/payments scoped to randomized emails.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 46 backend tests pass at https://gym-membership-hub-24.preview.emergentagent.com. Run with: `cd /app/backend && REACT_APP_BACKEND_URL=<preview-url> python -m pytest tests/ -v`. Important: any test booking a class MUST use a dynamic date within today..today+3 days — use the `_future_date(days)` helper in test_grindstation.py. Razorpay env vars are NOT set, so /api/subscribe/verify accepts just `pending_payment_id` (no razorpay_* signature fields). Forgot-password returns `dev_token` in response while PROD env var is unset.",
+  "rca of the issue": "Two regression failures observed (test_book_class_requires_active_membership, test_book_and_duplicate_and_cancel) were caused by STALE hardcoded session_date values (2026-02-15, 2026-03-10) in iteration 1 tests — both fall outside the new 3-day advance window. Backend correctly returns 400 ('Cannot book past sessions' / 'up to 3 days in advance') BEFORE the membership check, so the previous expectation of 403 no longer holds. Fixed by switching to dynamic _future_date(2). No backend code change needed; new advance-window feature is functioning per spec."
+}
