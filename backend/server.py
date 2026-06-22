@@ -35,7 +35,7 @@ db = client[os.environ['DB_NAME']]
 
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGO = "HS256"
-ACCESS_MIN = 60 * 8  # 8h
+ACCESS_MIN = 60 * 8
 REFRESH_DAYS = 7
 
 # ---------- Object Storage ----------
@@ -61,7 +61,6 @@ def put_object(path: str, data: bytes, content_type: str) -> dict:
                         headers={"X-Storage-Key": key, "Content-Type": content_type},
                         data=data, timeout=120)
     if resp.status_code == 403:
-        # refresh and retry once
         globals()['_storage_key'] = None
         key = init_storage()
         resp = requests.put(f"{STORAGE_URL}/objects/{path}",
@@ -82,15 +81,14 @@ def get_object(path: str):
     resp.raise_for_status()
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
-# ---------- Razorpay (with mock fallback) ----------
+# ---------- Razorpay ----------
 RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "").strip()
 RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "").strip()
 RAZORPAY_ENABLED = bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET and razorpay is not None)
 rzp_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)) if RAZORPAY_ENABLED else None
 
-# ---------- Email (console logger fallback) ----------
+# ---------- Email ----------
 def send_email(to: str, subject: str, body: str):
-    """Email stub. Logs to console. Plug Resend/SendGrid here when keys provided."""
     logger.info(f"[EMAIL → {to}] {subject}\n{body}\n---")
 
 logger = logging.getLogger("grindstation")
@@ -201,7 +199,6 @@ class PlanUpdate(BaseModel):
 class SubscribeIn(BaseModel):
     plan_id: str
     payment_method: Literal["upi", "debit_card", "credit_card"]
-    # mock card/upi details (not stored)
     card_last4: Optional[str] = None
     upi_id: Optional[str] = None
 
@@ -209,8 +206,8 @@ class ClassIn(BaseModel):
     name: str
     description: str
     trainer: str
-    day_of_week: str  # Mon..Sun
-    start_time: str   # HH:MM
+    day_of_week: str
+    start_time: str
     duration_minutes: int
     difficulty: Literal["Beginner", "Intermediate", "Advanced"]
     capacity: int
@@ -230,11 +227,11 @@ class ClassUpdate(BaseModel):
 
 class BookClassIn(BaseModel):
     class_id: str
-    session_date: str  # YYYY-MM-DD
+    session_date: str
 
 class RecoveryBookIn(BaseModel):
     facility: Literal["sauna", "steam", "ice"]
-    session_date: str  # YYYY-MM-DD
+    session_date: str
 
 class ContactIn(BaseModel):
     name: str
@@ -278,7 +275,6 @@ DEFAULT_CLASSES = [
 ]
 
 async def seed_data():
-    # indexes
     await db.users.create_index("email", unique=True)
     await db.users.create_index("id", unique=True)
     await db.plans.create_index("id", unique=True)
@@ -288,7 +284,6 @@ async def seed_data():
     await db.class_bookings.create_index([("user_id", 1), ("class_id", 1), ("session_date", 1)])
     await db.recovery_usage.create_index([("user_id", 1), ("facility", 1), ("year_month", 1)], unique=True)
 
-    # admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@grindstation.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@Grind2026")
     existing = await db.users.find_one({"email": admin_email})
@@ -303,7 +298,6 @@ async def seed_data():
             await db.users.update_one({"email": admin_email},
                                       {"$set": {"password_hash": hash_password(admin_password)}})
 
-    # test member
     member_email = "member@grindstation.com"
     if not await db.users.find_one({"email": member_email}):
         await db.users.insert_one({
@@ -312,13 +306,12 @@ async def seed_data():
             "created_at": iso(utcnow()),
         })
 
-    # plans
     if await db.plans.count_documents({}) == 0:
         for p in DEFAULT_PLANS:
             await db.plans.insert_one({"id": str(uuid.uuid4()), "active": True, "popular": p.get("popular", False),
                                        **{k: v for k, v in p.items() if k != "popular"},
                                        "created_at": iso(utcnow())})
-    # classes
+
     if await db.classes.count_documents({}) == 0:
         for c in DEFAULT_CLASSES:
             await db.classes.insert_one({"id": str(uuid.uuid4()), "active": True, **c,
@@ -366,7 +359,6 @@ async def logout(response: Response):
     clear_auth_cookies(response)
     return {"ok": True}
 
-# ---------- Forgot / Reset Password ----------
 class ForgotIn(BaseModel):
     email: EmailStr
 
@@ -378,7 +370,6 @@ class ResetIn(BaseModel):
 async def forgot_password(body: ForgotIn):
     email = body.email.lower()
     user = await db.users.find_one({"email": email})
-    # always respond 200 (don't leak which emails exist)
     if user:
         token = secrets.token_urlsafe(32)
         expires = utcnow() + timedelta(hours=1)
@@ -390,7 +381,6 @@ async def forgot_password(body: ForgotIn):
         reset_link = f"{frontend_url}/reset-password?token={token}" if frontend_url else f"/reset-password?token={token}"
         send_email(email, "Reset your Grind Station password",
                    f"Click this link to reset your password (valid 1 hour):\n{reset_link}\n\nIf you didn't request this, ignore this email.")
-        # also return token in development so it's testable without email
         return {"ok": True, "dev_token": token if not os.environ.get("PROD") else None}
     return {"ok": True}
 
@@ -416,9 +406,9 @@ async def reset_password(body: ResetIn):
 async def me(user: dict = Depends(get_current_user)):
     return public_user(user)
 
-# ---------- Avatar Upload ----------
+# ---------- Avatar ----------
 ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp"}
-MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
+MAX_AVATAR_SIZE = 2 * 1024 * 1024
 
 @api.post("/me/avatar")
 async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
@@ -444,7 +434,6 @@ async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(get_c
 
 @api.get("/me/avatar/{user_id}")
 async def get_avatar(user_id: str, authorization: Optional[str] = Header(None), auth: Optional[str] = Query(None)):
-    # Avatars are public (used in <img src=...>); no auth needed to view
     u = await db.users.find_one({"id": user_id}, {"_id": 0, "avatar_path": 1, "avatar_content_type": 1})
     if not u or not u.get("avatar_path"):
         raise HTTPException(404, "Avatar not found")
@@ -462,7 +451,7 @@ async def delete_avatar(user: dict = Depends(get_current_user)):
 
 # ---------- Plans ----------
 @api.get("/plans")
-async def list_plans(all_plans: bool = False, user: Optional[dict] = None):
+async def list_plans(all_plans: bool = False):
     q = {} if all_plans else {"active": True}
     plans = await db.plans.find(q, {"_id": 0}).to_list(100)
     plans.sort(key=lambda p: -p.get("price", 0))
@@ -491,10 +480,9 @@ async def delete_plan(plan_id: str, admin: dict = Depends(require_admin)):
     res = await db.plans.delete_one({"id": plan_id})
     return {"deleted": res.deleted_count}
 
-# ---------- Subscribe (Razorpay with mock fallback) ----------
+# ---------- Subscribe ----------
 @api.get("/payment/config")
 async def payment_config():
-    """Tells the frontend whether to use real Razorpay checkout or mock flow."""
     return {"razorpay_enabled": RAZORPAY_ENABLED, "key_id": RAZORPAY_KEY_ID if RAZORPAY_ENABLED else None}
 
 @api.post("/subscribe/create-order")
@@ -516,7 +504,6 @@ async def create_order(body: SubscribeIn, user: dict = Depends(get_current_user)
         except Exception as e:
             logger.error(f"Razorpay order creation failed: {e}")
             raise HTTPException(502, "Payment gateway error")
-    # store a pending payment record
     pending_id = str(uuid.uuid4())
     pending = {
         "id": pending_id, "user_id": user["id"], "plan_id": plan["id"], "plan_name": plan["name"],
@@ -550,7 +537,6 @@ async def verify_payment(body: VerifyPaymentIn, user: dict = Depends(get_current
         raise HTTPException(404, "Pending payment not found")
     if pending["status"] != "pending":
         raise HTTPException(400, f"Payment already {pending['status']}")
-    # verify signature when Razorpay is enabled
     if RAZORPAY_ENABLED:
         if not (body.razorpay_order_id and body.razorpay_payment_id and body.razorpay_signature):
             raise HTTPException(400, "Missing Razorpay verification fields")
@@ -559,7 +545,6 @@ async def verify_payment(body: VerifyPaymentIn, user: dict = Depends(get_current
         if not hmac.compare_digest(expected, body.razorpay_signature):
             await db.payments.update_one({"id": body.pending_payment_id}, {"$set": {"status": "failed"}})
             raise HTTPException(400, "Signature verification failed")
-    # mark success
     invoice_no = f"GS-{datetime.now().strftime('%Y%m')}-{secrets.token_hex(3).upper()}"
     await db.payments.update_one({"id": body.pending_payment_id},
                                  {"$set": {"status": "success", "invoice_no": invoice_no,
@@ -568,7 +553,6 @@ async def verify_payment(body: VerifyPaymentIn, user: dict = Depends(get_current
                                            "paid_at": iso(utcnow())}})
     payment = await db.payments.find_one({"id": body.pending_payment_id}, {"_id": 0})
     plan = await db.plans.find_one({"id": payment["plan_id"]}, {"_id": 0})
-    # create membership
     start = utcnow()
     months = int(plan["duration_months"])
     ext_days = int(plan.get("extension_days", 0))
@@ -583,12 +567,10 @@ async def verify_payment(body: VerifyPaymentIn, user: dict = Depends(get_current
     await db.memberships.update_many({"user_id": user["id"], "status": "active"}, {"$set": {"status": "expired"}})
     await db.memberships.insert_one(membership_doc)
     membership_doc.pop("_id", None)
-    # send confirmation email (stub)
     send_email(user["email"], f"Welcome to {plan['name']}",
                f"Hi {user.get('name','Member')},\n\nYour membership is active until {expiry.strftime('%d %b %Y')}.\nInvoice: {invoice_no}\nAmount: ₹{payment['amount']:,.2f}\n\n— The Grind Station")
     return {"payment": payment, "membership": membership_doc}
 
-# Legacy mock endpoint kept for backwards compatibility — still used when no Razorpay keys
 @api.post("/subscribe")
 async def subscribe(body: SubscribeIn, user: dict = Depends(get_current_user)):
     plan = await db.plans.find_one({"id": body.plan_id, "active": True}, {"_id": 0})
@@ -632,7 +614,6 @@ async def dashboard_me(user: dict = Depends(get_current_user)):
         {"user_id": user["id"], "status": "active"}, {"_id": 0}, sort=[("created_at", -1)])
     payments = await db.payments.find({"user_id": user["id"], "status": "success"}, {"_id": 0}).sort("created_at", -1).to_list(50)
     bookings = await db.class_bookings.find({"user_id": user["id"]}, {"_id": 0}).sort("session_date", -1).to_list(50)
-    # recovery usage for current month
     ym = utcnow().strftime("%Y-%m")
     recov = {}
     for fac in ["sauna", "steam", "ice"]:
@@ -650,12 +631,10 @@ async def get_invoice(payment_id: str, user: dict = Depends(get_current_user)):
 
 @api.get("/payments/{payment_id}/invoice.pdf")
 async def get_invoice_pdf(payment_id: str, user: dict = Depends(get_current_user)):
-    from io import BytesIO
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas
-    # StreamingResponse already imported at module level
 
     p = await db.payments.find_one({"id": payment_id, "user_id": user["id"]}, {"_id": 0})
     if not p:
@@ -668,32 +647,17 @@ async def get_invoice_pdf(payment_id: str, user: dict = Depends(get_current_user
     c = canvas.Canvas(buf, pagesize=A4)
     width, height = A4
 
-    # Header bar
     c.setFillColor(colors.HexColor("#0A0A0A"))
     c.rect(0, height - 40 * mm, width, 40 * mm, fill=True, stroke=False)
-
-# Header
     c.setFillColor(colors.HexColor("#FF4500"))
     c.setFont("Helvetica-Bold", 28)
     c.drawCentredString(width / 2, height - 22 * mm, "THE GRIND STATION")
-
-# Address
     c.setFillColor(colors.white)
     c.setFont("Helvetica", 10)
-    c.drawCentredString(
-    width / 2,
-    height - 30 * mm,
-    "9, Narayana Homes, Srivani Nagar, Miyapur, Telangana 502032"
-)
+    c.drawCentredString(width / 2, height - 30 * mm,
+                        "Vijaya Kakatiya Elite(Old Vijaya Theater) 4th floor,Kakaji Colony, Warangal, India 506001")
+    c.drawCentredString(width / 2, height - 35 * mm, "hello@grindstation.in")
 
-# Email (new row)
-    c.drawCentredString(
-    width / 2,
-    height - 35 * mm,
-    "hello@grindstation.in"
-)
-
-    # Invoice title
     c.setFillColor(colors.black)
     c.setFont("Helvetica-Bold", 22)
     c.drawString(20 * mm, height - 55 * mm, "INVOICE")
@@ -702,7 +666,6 @@ async def get_invoice_pdf(payment_id: str, user: dict = Depends(get_current_user
     c.drawRightString(width - 20 * mm, height - 58 * mm, f"Date: {p['created_at'][:10]}")
     c.drawRightString(width - 20 * mm, height - 64 * mm, f"Method: {p.get('method','').replace('_',' ').upper()}")
 
-    # Bill to
     c.setFont("Helvetica-Bold", 11)
     c.drawString(20 * mm, height - 75 * mm, "BILL TO")
     c.setFont("Helvetica", 10)
@@ -710,7 +673,6 @@ async def get_invoice_pdf(payment_id: str, user: dict = Depends(get_current_user
     c.drawString(20 * mm, height - 87 * mm, user.get("email", ""))
     c.drawString(20 * mm, height - 92 * mm, user.get("mobile", ""))
 
-    # Table
     y = height - 110 * mm
     c.setFillColor(colors.HexColor("#F3F4F6"))
     c.rect(20 * mm, y, width - 40 * mm, 9 * mm, fill=True, stroke=False)
@@ -731,7 +693,6 @@ async def get_invoice_pdf(payment_id: str, user: dict = Depends(get_current_user
         c.drawRightString(width - 22 * mm, y, f"- ₹ {disc_value:,.2f}")
         c.setFillColor(colors.black)
 
-    # Total
     y -= 12 * mm
     c.setStrokeColor(colors.HexColor("#0A0A0A"))
     c.setLineWidth(0.5)
@@ -752,11 +713,9 @@ async def get_invoice_pdf(payment_id: str, user: dict = Depends(get_current_user
         if mem.get("extension_days"):
             c.drawString(20 * mm, y - 18 * mm, f"Includes {mem['extension_days']} bonus days")
 
-    # Footer
     c.setFillColor(colors.HexColor("#6B7280"))
     c.setFont("Helvetica-Oblique", 8)
     c.drawCentredString(width / 2, 15 * mm, "Thank you for choosing The Grind Station — Transform Your Body. Build Your Grind.")
-
     c.showPage()
     c.save()
     buf.seek(0)
@@ -803,7 +762,6 @@ async def book_class(body: BookClassIn, user: dict = Depends(get_current_user)):
     cls = await db.classes.find_one({"id": body.class_id, "active": True}, {"_id": 0})
     if not cls:
         raise HTTPException(404, "Class not found")
-    # advance-booking window: today through next 3 days inclusive
     try:
         target = datetime.strptime(body.session_date, "%Y-%m-%d").date()
     except ValueError:
@@ -814,17 +772,14 @@ async def book_class(body: BookClassIn, user: dict = Depends(get_current_user)):
         raise HTTPException(400, "Cannot book past sessions")
     if delta > 3:
         raise HTTPException(400, "You can only book up to 3 days in advance")
-    # membership check
     mem = await db.memberships.find_one({"user_id": user["id"], "status": "active"}, {"_id": 0}, sort=[("created_at", -1)])
     if not has_active_membership(mem):
         raise HTTPException(403, "Active membership required to book classes")
-    # already booked?
     existing = await db.class_bookings.find_one(
         {"user_id": user["id"], "class_id": body.class_id, "session_date": body.session_date,
          "status": {"$in": ["confirmed", "waitlist"]}})
     if existing:
         raise HTTPException(400, "You already booked this session")
-    # count current bookings for this session
     booked_count = await db.class_bookings.count_documents(
         {"class_id": body.class_id, "session_date": body.session_date, "status": "confirmed"})
     status_val = "confirmed" if booked_count < int(cls["capacity"]) else "waitlist"
@@ -909,7 +864,6 @@ async def admin_analytics(admin: dict = Depends(require_admin)):
     active_members = await db.memberships.count_documents({"status": "active"})
     payments = await db.payments.find({"status": "success"}, {"_id": 0}).to_list(10000)
     revenue = sum(p.get("amount", 0) for p in payments)
-    # most booked classes
     pipeline = [
         {"$match": {"status": "confirmed"}},
         {"$group": {"_id": "$class_name", "count": {"$sum": 1}}},
@@ -917,17 +871,13 @@ async def admin_analytics(admin: dict = Depends(require_admin)):
         {"$limit": 5},
     ]
     most_booked = await db.class_bookings.aggregate(pipeline).to_list(10)
-    # plan sales
     plan_sales_pipe = [
         {"$match": {"status": "success"}},
         {"$group": {"_id": "$plan_name", "count": {"$sum": 1}, "revenue": {"$sum": "$amount"}}},
         {"$sort": {"count": -1}},
     ]
     plan_sales = await db.payments.aggregate(plan_sales_pipe).to_list(20)
-    # recovery usage stats
-    rec_pipe = [
-        {"$group": {"_id": "$facility", "total": {"$sum": "$count"}}},
-    ]
+    rec_pipe = [{"$group": {"_id": "$facility", "total": {"$sum": "$count"}}}]
     recovery_stats = await db.recovery_usage.aggregate(rec_pipe).to_list(10)
     return {
         "total_users": total_users,
@@ -973,29 +923,21 @@ async def admin_contact(admin: dict = Depends(require_admin)):
 async def root():
     return {"ok": True, "service": "The Grind Station"}
 
+# ========== APP SETUP (order matters!) ==========
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:8000",
+        "https://thegrindstation.in",
+        "https://api.thegrindstation.in",
+        "https://localhost",
+        "https://localhost",
+        "capacitor://localhost",
+        "ionic://localhost",
+        "https://api.thegrindstation.in",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-@api.get("/")
-async def root():
-    return {"ok": True, "service": "The Grind Station"}
 
-app.include_router(api)   # <-- ADD THIS LINE
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:8000",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.include_router(api)

@@ -17,10 +17,87 @@ const EMPTY_CLASS = {
   duration_minutes: 60, difficulty: "Beginner", capacity: 10, image_url: "",
 };
 
+const EMPTY_PLAN = {
+  name: "", price: "", duration_months: 1, extension_days: 0,
+  discount_percent: 0, features: [], active: true, popular: false,
+};
+
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DIFFICULTIES = ["Beginner", "Intermediate", "Advanced"];
-
 const NEW_NAME_OPTION = "__new__";
+
+function PlanForm({ initial, onSave, onCancel, saving }) {
+  const [form, setForm] = useState({ ...initial, features: initial.features?.join(", ") || "" });
+  const update = (k, v) => setForm({ ...form, [k]: v });
+
+  const submit = (e) => {
+    e.preventDefault();
+    const features = form.features.split(",").map(f => f.trim()).filter(Boolean);
+    onSave({ ...form, features, price: Number(form.price), duration_months: Number(form.duration_months), extension_days: Number(form.extension_days), discount_percent: Number(form.discount_percent) });
+  };
+
+  return (
+    <form onSubmit={submit} className="card-dark p-5 space-y-3" data-testid="plan-form">
+      <div className="flex items-center justify-between">
+        <h3 className="heading text-lg">{initial.id ? "Edit Plan" : "New Plan"}</h3>
+        <button type="button" onClick={onCancel} className="text-white/60 hover:text-white"><X size={18} /></button>
+      </div>
+
+      <input className="input-dark" placeholder="Plan Name" required
+        value={form.name} onChange={e => update("name", e.target.value)} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Price (₹)</label>
+          <input type="number" className="input-dark" required min={1}
+            value={form.price} onChange={e => update("price", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Duration (months)</label>
+          <input type="number" className="input-dark" required min={1}
+            value={form.duration_months} onChange={e => update("duration_months", e.target.value)} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Extension Days</label>
+          <input type="number" className="input-dark" min={0}
+            value={form.extension_days} onChange={e => update("extension_days", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Discount %</label>
+          <input type="number" className="input-dark" min={0} max={90}
+            value={form.discount_percent} onChange={e => update("discount_percent", e.target.value)} />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Features (comma separated)</label>
+        <textarea className="input-dark" rows={2} placeholder="Full Gym Access, Group Classes, Recovery Zone Access"
+          value={form.features} onChange={e => update("features", e.target.value)} />
+      </div>
+
+      <div className="flex gap-6">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={form.active} onChange={e => update("active", e.target.checked)} />
+          <span className="text-white/70">Active</span>
+        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={form.popular} onChange={e => update("popular", e.target.checked)} />
+          <span className="text-white/70">Most Popular</span>
+        </label>
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center">
+          {saving ? "Saving…" : "Save Plan"}
+        </button>
+        <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center">Cancel</button>
+      </div>
+    </form>
+  );
+}
 
 function ClassForm({ initial, onSave, onCancel, saving, existingClasses }) {
   const [form, setForm] = useState(initial);
@@ -30,11 +107,7 @@ function ClassForm({ initial, onSave, onCancel, saving, existingClasses }) {
   });
 
   const update = (k, v) => setForm({ ...form, [k]: v });
-
-  const submit = (e) => {
-    e.preventDefault();
-    onSave(form);
-  };
+  const submit = (e) => { e.preventDefault(); onSave(form); };
 
   const uniqueByName = [];
   const seen = new Set();
@@ -43,11 +116,7 @@ function ClassForm({ initial, onSave, onCancel, saving, existingClasses }) {
   }
 
   const handleNameSelect = (value) => {
-    if (value === NEW_NAME_OPTION) {
-      setNameMode("type");
-      update("name", "");
-      return;
-    }
+    if (value === NEW_NAME_OPTION) { setNameMode("type"); update("name", ""); return; }
     const picked = existingClasses.find(c => c.name === value);
     if (picked) {
       const { id, created_at, active, ...rest } = picked;
@@ -59,53 +128,42 @@ function ClassForm({ initial, onSave, onCancel, saving, existingClasses }) {
     <form onSubmit={submit} className="card-dark p-5 space-y-3" data-testid="class-form">
       <div className="flex items-center justify-between">
         <h3 className="heading text-lg">{initial.id ? "Edit Class" : "New Class"}</h3>
-        <button type="button" onClick={onCancel} className="text-white/60 hover:text-white" data-testid="class-form-cancel">
-          <X size={18} />
-        </button>
+        <button type="button" onClick={onCancel} className="text-white/60 hover:text-white" data-testid="class-form-cancel"><X size={18} /></button>
       </div>
 
       <div>
         <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Class Name</label>
         {nameMode === "select" ? (
-          <select className="input-dark" value={form.name || NEW_NAME_OPTION} onChange={e => handleNameSelect(e.target.value)}
-            data-testid="class-form-name-select">
+          <select className="input-dark" value={form.name || NEW_NAME_OPTION} onChange={e => handleNameSelect(e.target.value)}>
             <option value={NEW_NAME_OPTION}>+ Add New Class Name</option>
             {uniqueByName.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
           </select>
         ) : (
           <input className="input-dark" placeholder="Class Name" required autoFocus
-            value={form.name} onChange={e => update("name", e.target.value)}
-            data-testid="class-form-name" />
+            value={form.name} onChange={e => update("name", e.target.value)} />
         )}
         {nameMode === "type" && uniqueByName.length > 0 && (
-          <button type="button" onClick={() => setNameMode("select")}
-            className="text-xs text-white/50 hover:text-orange mt-1 underline">
+          <button type="button" onClick={() => setNameMode("select")} className="text-xs text-white/50 hover:text-orange mt-1 underline">
             Choose from existing classes instead
           </button>
         )}
       </div>
 
       <textarea className="input-dark" placeholder="Description" required rows={2}
-        value={form.description} onChange={e => update("description", e.target.value)}
-        data-testid="class-form-description" />
-
+        value={form.description} onChange={e => update("description", e.target.value)} />
       <input className="input-dark" placeholder="Trainer Name" required
-        value={form.trainer} onChange={e => update("trainer", e.target.value)}
-        data-testid="class-form-trainer" />
+        value={form.trainer} onChange={e => update("trainer", e.target.value)} />
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Day of Week</label>
-          <select className="input-dark" value={form.day_of_week} onChange={e => update("day_of_week", e.target.value)}
-            data-testid="class-form-day">
+          <select className="input-dark" value={form.day_of_week} onChange={e => update("day_of_week", e.target.value)}>
             {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
         <div>
           <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Start Time</label>
-          <input type="time" className="input-dark" required
-            value={form.start_time} onChange={e => update("start_time", e.target.value)}
-            data-testid="class-form-time" />
+          <input type="time" className="input-dark" required value={form.start_time} onChange={e => update("start_time", e.target.value)} />
         </div>
       </div>
 
@@ -113,36 +171,30 @@ function ClassForm({ initial, onSave, onCancel, saving, existingClasses }) {
         <div>
           <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Duration (minutes)</label>
           <input type="number" className="input-dark" required min={5}
-            value={form.duration_minutes} onChange={e => update("duration_minutes", Number(e.target.value))}
-            data-testid="class-form-duration" />
+            value={form.duration_minutes} onChange={e => update("duration_minutes", Number(e.target.value))} />
         </div>
         <div>
           <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Capacity</label>
           <input type="number" className="input-dark" required min={1}
-            value={form.capacity} onChange={e => update("capacity", Number(e.target.value))}
-            data-testid="class-form-capacity" />
+            value={form.capacity} onChange={e => update("capacity", Number(e.target.value))} />
         </div>
       </div>
 
       <div>
         <label className="text-xs uppercase tracking-widest text-white/50 mb-1 block">Difficulty</label>
-        <select className="input-dark" value={form.difficulty} onChange={e => update("difficulty", e.target.value)}
-          data-testid="class-form-difficulty">
+        <select className="input-dark" value={form.difficulty} onChange={e => update("difficulty", e.target.value)}>
           {DIFFICULTIES.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
       </div>
 
       <input className="input-dark" placeholder="Image URL (optional)"
-        value={form.image_url || ""} onChange={e => update("image_url", e.target.value)}
-        data-testid="class-form-image" />
+        value={form.image_url || ""} onChange={e => update("image_url", e.target.value)} />
 
       <div className="flex gap-3 pt-2">
-        <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center" data-testid="class-form-submit">
+        <button type="submit" disabled={saving} className="btn-primary flex-1 justify-center">
           {saving ? "Saving…" : "Save Class"}
         </button>
-        <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center">
-          Cancel
-        </button>
+        <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center">Cancel</button>
       </div>
     </form>
   );
@@ -158,6 +210,10 @@ export default function AdminDashboard() {
   const [recovery, setRecovery] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [removingTrainer, setRemovingTrainer] = useState(null);
+
+  // Plan editing state
+  const [editingPlan, setEditingPlan] = useState(null);
+  const [savingPlan, setSavingPlan] = useState(false);
 
   // Class editing state
   const [editingClass, setEditingClass] = useState(null);
@@ -180,25 +236,43 @@ export default function AdminDashboard() {
       toast.error(formatErr(e.response?.data?.detail) || "Failed to load");
     }
   };
+
   useEffect(() => { loadAll(); }, []);
 
-  const updatePlanDiscount = async (id, v) => {
+  // ---- Plan CRUD ----
+  const savePlan = async (form) => {
+    setSavingPlan(true);
     try {
-      await api.put(`/plans/${id}`, { discount_percent: Number(v) });
-      toast.success("Discount updated");
+      if (form.id) {
+        const { id, created_at, ...updates } = form;
+        await api.put(`/plans/${id}`, updates);
+        toast.success("Plan updated");
+      } else {
+        await api.post("/plans", form);
+        toast.success("Plan created");
+      }
+      setEditingPlan(null);
       loadAll();
-    } catch (e) { toast.error(formatErr(e.response?.data?.detail)); }
+    } catch (e) {
+      toast.error(formatErr(e.response?.data?.detail) || "Failed to save plan");
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  const deletePlan = async (id, name) => {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/plans/${id}`);
+      toast.success("Plan deleted");
+      loadAll();
+    } catch (e) {
+      toast.error(formatErr(e.response?.data?.detail) || "Failed to delete plan");
+    }
   };
 
   const togglePlan = async (id, active) => {
     await api.put(`/plans/${id}`, { active: !active });
-    loadAll();
-  };
-
-  const resetRecovery = async () => {
-    if (!window.confirm("Reset all members' recovery usage for this month?")) return;
-    await api.post("/admin/recovery/reset");
-    toast.success("Recovery usage reset");
     loadAll();
   };
 
@@ -255,7 +329,13 @@ export default function AdminDashboard() {
     }
   };
 
-  // Derive unique trainers from classes
+  const resetRecovery = async () => {
+    if (!window.confirm("Reset all members' recovery usage for this month?")) return;
+    await api.post("/admin/recovery/reset");
+    toast.success("Recovery usage reset");
+    loadAll();
+  };
+
   const uniqueTrainers = [...new Set(classes.map(c => c.trainer).filter(t => t && t !== "TBA"))];
 
   return (
@@ -321,33 +401,64 @@ export default function AdminDashboard() {
         )}
 
         {tab === "plans" && (
-          <div className="mt-10 card-dark overflow-hidden" data-testid="plans-table">
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-widest text-white/50">
-                <tr className="border-b border-white/10">
-                  <th className="text-left p-4">Plan</th>
-                  <th className="text-left p-4">Price</th>
-                  <th className="text-left p-4">Months</th>
-                  <th className="text-left p-4">Discount %</th>
-                  <th className="text-left p-4">Active</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plans.map((p) => (
-                  <tr key={p.id} className="border-b border-white/10">
-                    <td className="p-4 font-bold">{p.name}</td>
-                    <td className="p-4">₹{p.price.toLocaleString("en-IN")}</td>
-                    <td className="p-4">{p.duration_months} +{p.extension_days}d</td>
-                    <td className="p-4">
-                      <input type="number" defaultValue={p.discount_percent} min={0} max={90} onBlur={(e)=>updatePlanDiscount(p.id, e.target.value)} className="input-dark max-w-[100px]" data-testid={`discount-input-${p.id}`} />
-                    </td>
-                    <td className="p-4">
-                      <button onClick={() => togglePlan(p.id, p.active)} className={`text-xs uppercase tracking-widest font-bold ${p.active?"text-emerald-400":"text-rose-400"}`}>{p.active?"Active":"Disabled"}</button>
-                    </td>
+          <div className="mt-10">
+            {editingPlan ? (
+              <div className="max-w-xl mb-8">
+                <PlanForm
+                  initial={editingPlan === "new" ? EMPTY_PLAN : editingPlan}
+                  onSave={savePlan}
+                  onCancel={() => setEditingPlan(null)}
+                  saving={savingPlan}
+                />
+              </div>
+            ) : (
+              <div className="mb-5">
+                <button className="btn-primary" onClick={() => setEditingPlan("new")} data-testid="new-plan-btn">
+                  <Plus size={16} /> New Plan
+                </button>
+              </div>
+            )}
+
+            <div className="card-dark overflow-hidden" data-testid="plans-table">
+              <table className="w-full text-sm">
+                <thead className="text-xs uppercase tracking-widest text-white/50">
+                  <tr className="border-b border-white/10">
+                    <th className="text-left p-4">Plan</th>
+                    <th className="text-left p-4">Price</th>
+                    <th className="text-left p-4">Months</th>
+                    <th className="text-left p-4">Discount %</th>
+                    <th className="text-left p-4">Active</th>
+                    <th className="text-left p-4">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {plans.map((p) => (
+                    <tr key={p.id} className="border-b border-white/10">
+                      <td className="p-4 font-bold">{p.name}</td>
+                      <td className="p-4">₹{p.price.toLocaleString("en-IN")}</td>
+                      <td className="p-4">{p.duration_months} +{p.extension_days}d</td>
+                      <td className="p-4 text-orange font-bold">{p.discount_percent}%</td>
+                      <td className="p-4">
+                        <button onClick={() => togglePlan(p.id, p.active)}
+                          className={`text-xs uppercase tracking-widest font-bold ${p.active ? "text-emerald-400" : "text-rose-400"}`}>
+                          {p.active ? "Active" : "Disabled"}
+                        </button>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex gap-3">
+                          <button onClick={() => setEditingPlan(p)} className="text-white/60 hover:text-orange" data-testid={`edit-plan-${p.id}`}>
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => deletePlan(p.id, p.name)} className="text-white/60 hover:text-rose-400" data-testid={`delete-plan-${p.id}`}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -355,7 +466,13 @@ export default function AdminDashboard() {
           <div className="mt-10 card-dark overflow-hidden" data-testid="users-table">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-widest text-white/50">
-                <tr className="border-b border-white/10"><th className="text-left p-4">Name</th><th className="text-left p-4">Email</th><th className="text-left p-4">Mobile</th><th className="text-left p-4">Plan</th><th className="text-left p-4">Expires</th></tr>
+                <tr className="border-b border-white/10">
+                  <th className="text-left p-4">Name</th>
+                  <th className="text-left p-4">Email</th>
+                  <th className="text-left p-4">Mobile</th>
+                  <th className="text-left p-4">Plan</th>
+                  <th className="text-left p-4">Expires</th>
+                </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
@@ -391,7 +508,6 @@ export default function AdminDashboard() {
                 </button>
               </div>
             )}
-
             <div className="mt-5 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {classes.map((c) => (
                 <div key={c.id} className="card-dark p-5" data-testid={`class-card-${c.id}`}>
@@ -417,7 +533,7 @@ export default function AdminDashboard() {
 
         {tab === "trainers" && (
           <div className="mt-10" data-testid="trainers-admin">
-            <p className="text-white/70 mb-6">All active trainers assigned to classes. Removing a trainer sets their classes to "TBA" — class data is kept.</p>
+            <p className="text-white/70 mb-6">All active trainers assigned to classes. Removing a trainer sets their classes to "TBA".</p>
             <div className="card-dark overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="text-xs uppercase tracking-widest text-white/50">
@@ -437,17 +553,12 @@ export default function AdminDashboard() {
                     return (
                       <tr key={trainer} className="border-b border-white/10">
                         <td className="p-4 font-bold">{trainer}</td>
-                        <td className="p-4 text-white/60 max-w-xs">
-                          {trainerClasses.map(c => c.name).join(", ")}
-                        </td>
+                        <td className="p-4 text-white/60 max-w-xs">{trainerClasses.map(c => c.name).join(", ")}</td>
                         <td className="p-4 text-white/60">{trainerClasses.length}</td>
                         <td className="p-4">
-                          <button
-                            disabled={removingTrainer === trainer}
-                            onClick={() => removeTrainer(trainer)}
-                            className="flex items-center gap-1.5 text-xs uppercase tracking-widest font-bold text-rose-400 hover:text-rose-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                            data-testid={`remove-trainer-${trainer}`}
-                          >
+                          <button disabled={removingTrainer === trainer} onClick={() => removeTrainer(trainer)}
+                            className="flex items-center gap-1.5 text-xs uppercase tracking-widest font-bold text-rose-400 hover:text-rose-300 disabled:opacity-50"
+                            data-testid={`remove-trainer-${trainer}`}>
                             <UserMinus size={14} />
                             {removingTrainer === trainer ? "Removing…" : "Remove"}
                           </button>
@@ -458,9 +569,6 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
-            {uniqueTrainers.length > 0 && (
-              <p className="text-xs text-white/40 mt-4">* To reassign a removed trainer's classes, go to the Classes tab and edit each class individually.</p>
-            )}
           </div>
         )}
 
@@ -468,7 +576,13 @@ export default function AdminDashboard() {
           <div className="mt-10 card-dark overflow-hidden" data-testid="payments-table">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-widest text-white/50">
-                <tr className="border-b border-white/10"><th className="text-left p-4">Invoice</th><th className="text-left p-4">Plan</th><th className="text-left p-4">Method</th><th className="text-left p-4">Amount</th><th className="text-left p-4">Date</th></tr>
+                <tr className="border-b border-white/10">
+                  <th className="text-left p-4">Invoice</th>
+                  <th className="text-left p-4">Plan</th>
+                  <th className="text-left p-4">Method</th>
+                  <th className="text-left p-4">Amount</th>
+                  <th className="text-left p-4">Date</th>
+                </tr>
               </thead>
               <tbody>
                 {payments.map((p) => (
@@ -489,12 +603,19 @@ export default function AdminDashboard() {
           <div className="mt-10" data-testid="recovery-admin">
             <div className="flex items-center justify-between mb-4">
               <p className="text-white/70">Monthly recovery usage by member.</p>
-              <button className="btn-secondary text-xs" onClick={resetRecovery} data-testid="reset-recovery-btn"><RotateCcw size={14}/> Reset This Month</button>
+              <button className="btn-secondary text-xs" onClick={resetRecovery} data-testid="reset-recovery-btn">
+                <RotateCcw size={14}/> Reset This Month
+              </button>
             </div>
             <div className="card-dark overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="text-xs uppercase tracking-widest text-white/50">
-                  <tr className="border-b border-white/10"><th className="text-left p-4">User ID</th><th className="text-left p-4">Facility</th><th className="text-left p-4">Used</th><th className="text-left p-4">Month</th></tr>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left p-4">User ID</th>
+                    <th className="text-left p-4">Facility</th>
+                    <th className="text-left p-4">Used</th>
+                    <th className="text-left p-4">Month</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {recovery.map((r) => (

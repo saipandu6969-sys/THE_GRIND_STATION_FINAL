@@ -1,0 +1,8 @@
+{
+  "appId": "com.thegrindstation.app",
+  "appName": "THE GRIND STATION",
+  "webDir": "build",
+  "server": {
+    "androidScheme": "http"
+  }
+}

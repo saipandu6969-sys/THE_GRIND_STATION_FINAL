@@ -1,7 +1,6 @@
 import axios from "axios";
 
-const BACKEND_URL = "http://127.0.0.1:8000";
-
+const BACKEND_URL = window.BACKEND_URL || "https://api.thegrindstation.in";
 export const API_BASE = `${BACKEND_URL}/api`;
 
 const api = axios.create({
@@ -11,11 +10,9 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("gs_token");
-
   if (token) {
     config.headers["Authorization"] = `Bearer ${token}`;
   }
-
   return config;
 });
 

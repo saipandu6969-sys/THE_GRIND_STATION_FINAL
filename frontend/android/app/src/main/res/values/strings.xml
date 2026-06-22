@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">THE GRIND STATION</string>
+    <string name="title_activity_main">THE GRIND STATION</string>
+    <string name="package_name">com.thegrindstation.app</string>
+    <string name="custom_url_scheme">com.thegrindstation.app</string>
+</resources>
